@@ -90,10 +90,10 @@ end
 
 (* Headers *)
 
-let htmlact = Http.Headers.name "htmlact"
-let redirect = Http.Headers.name "htmlact-redirect"
-let reload = Http.Headers.name "htmlact-reload"
-let location_push = Http.Headers.name "htmlact-location-push"
-let location_replace = Http.Headers.name "htmlact-location-replace"
-let location_title = Http.Headers.name "htmlact-location-title"
-let encode_location_title = Url.Percent.encode `Uri
+let htmlact = Http.Headers.Name.make "htmlact"
+let redirect = Http.Headers.Name.make "htmlact-redirect"
+let reload = Http.Headers.Name.make "htmlact-reload"
+let location_push = Http.Headers.Name.make "htmlact-location-push"
+let location_replace = Http.Headers.Name.make "htmlact-location-replace"
+let location_title = Http.Headers.Name.make "htmlact-location-title"
+let encode_location_title = Url.Percent.encode Uri

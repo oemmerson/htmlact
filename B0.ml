@@ -75,7 +75,7 @@ let default =
            "--with-webs" "%{webs:installed}%"
            "--with-htmlit" "%{htmlit:installed}%"]]|}
     |> ~~ B0_opam.depends [
-      "ocaml", {|>= "4.14.0"|};
+      "ocaml", {|>= "5.4.0"|};
       "ocamlfind", {|build|};
       "ocamlbuild", {|build|};
       "topkg", {|build & >= "1.1.0"|};

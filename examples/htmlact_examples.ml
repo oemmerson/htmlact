@@ -55,7 +55,7 @@ let serve_example ~example request =
   | Some (module E : Example.T) -> E.serve request
 
 let service ~file_root request =
-  Http.Response.result @@
+  Result.retract @@
   let* () = Http.Request.clean_path request in
   match Http.Request.path request with
   | ["htmlact-page.js" | "htmlact-page.map"] ->

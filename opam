@@ -13,7 +13,7 @@ animations and inclusion of a generic JavaScript driver.
 Htmlact is distributed under the ISC license. It has no dependencies 
 but compilation of the JavaScript driver depends on [brr]. 
 
-Homepage: https://erratique.ch/software/htmlact
+Homepage: <https://erratique.ch/software/htmlact>
 
 [brr]: https://erratique.ch/software/brr"""
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
@@ -24,7 +24,7 @@ homepage: "https://erratique.ch/software/htmlact"
 doc: "https://erratique.ch/software/htmlact/doc"
 bug-reports: "https://github.com/dbuenzli/htmlact/issues"
 depends: [
-  "ocaml" {>= "4.14.0"}
+  "ocaml" {>= "5.4.0"}
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build & >= "1.1.0"}
