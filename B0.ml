@@ -38,7 +38,7 @@ let htmlact_examples =
   let requires = [unix; htmlact; webs; webs_cli; webs_unix; htmlit] in
   let srcs = [`Dir ~/"examples"] in
   let exec_env env u =
-    let driver_dir = Fpath.to_string (B0_env.unit_dir env htmlact_page_js) in
+    let driver_dir = Filepath.to_string (B0_env.unit_dir env htmlact_page_js) in
     let env = B0_env.build_env env in
     Ok (Os.Env.add "HTMLACT_FILE_ROOT" driver_dir env)
   in
