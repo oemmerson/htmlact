@@ -1,0 +1,178 @@
+<!doctype html>
+<!-- Self-testing page for the htmlact driver. Open it in a browser, or run
+     test/run.mjs which serves it and drives a Chrome with a remote debugging
+     port. The fetch stub must be installed before htmlact-page.js loads,
+     because the driver captures window.fetch when it is evaluated. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>htmlact tests</title>
+</head>
+<body>
+<div id="log" style="white-space: pre; font-family: monospace"></div>
+
+<script>
+  // ---- request stub ------------------------------------------------------
+  window.__requests = [];
+  window.__respond = function () { return { status: 200, body: "" }; };
+  window.fetch = async function (req) {
+    var method = req.method || "GET";
+    var bodyText = method === "GET" || method === "HEAD" ? "" : await req.text();
+    var call = { url: req.url, method: method, body: bodyText };
+    window.__requests.push(call);
+    var r = await window.__respond(call) || {};
+    if (r.delay) await new Promise(function (d) { setTimeout(d, r.delay); });
+    return new Response(r.body == null ? "" : r.body, {
+      status: r.status || 200,
+      headers: r.headers || {},
+    });
+  };
+</script>
+<script src="htmlact-page.js"></script>
+<script>
+  // ---- tiny harness ------------------------------------------------------
+  var results = [];
+  window.__htmlactTests = { done: false, results: results };
+  var tests = [];
+
+  function test(name, fn) { tests.push({ name: name, fn: fn }); }
+
+  function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+
+  async function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  async function until(pred, ms) {
+    ms = ms || 2000;
+    var t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      try { if (pred()) return true; } catch (e) {}
+      await sleep(15);
+    }
+    return false;
+  }
+
+  async function fixture(html) {
+    var w = document.createElement("div");
+    w.className = "fixture";
+    w.innerHTML = html.trim();
+    document.body.appendChild(w);
+    await sleep(0); // let the driver's MutationObserver connect the subtree
+    return w;
+  }
+
+  function byId(id) { return document.getElementById(id); }
+
+  // ---- tests -------------------------------------------------------------
+
+  test("a form request posts its fields and replaces its children", async function () {
+    window.__respond = function () { return { body: '<p id="t1-out">ok</p>' }; };
+    var f = await fixture('<form id="t1" data-request="POST /t1"><input name="a" value="1"><button type="submit">go</button></form>');
+    f.querySelector("button").click();
+    assert(await until(function () { return byId("t1-out"); }), "response applied");
+    var req = window.__requests[window.__requests.length - 1];
+    assert(req.method === "POST", "method POST, got " + req.method);
+    assert(req.body.indexOf("a=1") >= 0, "body carries a=1, got " + req.body);
+    assert(byId("t1") !== null, "children effect keeps the form");
+  });
+
+  test("data-effect=element replaces the request element", async function () {
+    window.__respond = function () { return { body: '<span id="t2-out">two</span>' }; };
+    var w = await fixture('<button type="button" id="t2" data-request="GET /t2" data-effect="element">go</button>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t2-out"); }), "swapped in");
+    assert(byId("t2") === null, "old element removed");
+  });
+
+  test("data-target walks up and then selects", async function () {
+    window.__respond = function () { return { body: "THREE" }; };
+    var w = await fixture('<p><button type="button" id="t3" data-request="GET /t3" data-target=":up #t3-out" data-effect="children">go</button><span id="t3-out"></span></p>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t3-out").textContent === "THREE"; }), "target filled");
+  });
+
+  test("data-query :up gathers the enclosing form", async function () {
+    window.__respond = function () { return { body: "x" }; };
+    var w = await fixture('<form><input name="q" value="hello"><button type="button" id="t4" data-request="GET /t4" data-query=":up" data-effect="none">go</button></form>');
+    w.querySelector("button").click();
+    assert(await until(function () { return window.__requests.some(function (r) { return r.url.indexOf("/t4") >= 0; }); }), "request sent");
+    var req = window.__requests[window.__requests.length - 1];
+    assert(req.url.indexOf("q=hello") >= 0, "query carries q=hello, got " + req.url);
+  });
+
+  test("feedback carries htmlact-request while in flight", async function () {
+    window.__respond = function () { return { body: "FIVE", delay: 150 }; };
+    var w = await fixture('<button type="button" id="t5" data-request="GET /t5" data-target=":up #t5-out" data-effect="children" data-feedback=":up #t5-out">go</button><span id="t5-out"></span>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t5-out").classList.contains("htmlact-request"); }), "request class during flight");
+    assert(await until(function () { return byId("t5-out").textContent === "FIVE"; }), "response applied");
+    assert(!byId("t5-out").classList.contains("htmlact-request"), "request class removed");
+  });
+
+  test("a failed request classifies htmlact-error", async function () {
+    window.__respond = function () { throw new Error("boom"); };
+    var w = await fixture('<button type="button" id="t6" data-request="GET /t6" data-target=":up #t6-out" data-effect="children" data-feedback=":up #t6-out">go</button><span id="t6-out"></span>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t6-out").classList.contains("htmlact-error"); }), "error class");
+    assert(byId("t6-out").textContent === "", "no swap on error");
+  });
+
+  test("data-response-sel swaps only the selected part", async function () {
+    window.__respond = function () {
+      return { body: '<html><body><div id="t7-want">WANT</div><div id="t7-other">NO</div></body></html>' };
+    };
+    var w = await fixture('<button type="button" id="t7" data-request="GET /t7" data-response-sel="#t7-want" data-effect="element">go</button>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t7-want"); }), "selected part swapped in");
+    assert(byId("t7-other") === null, "unselected part not swapped");
+  });
+
+  test("a response selector that matches nothing errors", async function () {
+    window.__respond = function () { return { body: "<p>nothing</p>" }; };
+    var w = await fixture('<button type="button" id="t8" data-request="GET /t8" data-response-sel="#missing" data-effect="element">go</button>');
+    var b = w.querySelector("button");
+    b.click();
+    assert(await until(function () { return b.classList.contains("htmlact-error"); }), "error classified");
+    assert(byId("t8") !== null, "no swap happened");
+  });
+
+  test("an older response does not overwrite a newer one", async function () {
+    var n = 0;
+    window.__respond = function () {
+      n += 1;
+      return n === 1 ? { body: "OLD", delay: 250 } : { body: "NEW", delay: 10 };
+    };
+    var w = await fixture('<button type="button" id="t9" data-request="GET /t9" data-target=":up #t9-out" data-effect="children">go</button><span id="t9-out">start</span>');
+    var b = w.querySelector("button");
+    b.click();
+    await sleep(20);
+    b.click();
+    var ok = await until(function () { return byId("t9-out").textContent === "NEW"; });
+    assert(ok, "newer response applied; text=" + (byId("t9-out") || {}).textContent + " requests=" + window.__requests.length + " seq=" + (document.getElementById("t9") || {}).htmlactRequestSeq + " html=" + w.innerHTML);
+    await sleep(400);
+    assert(byId("t9-out").textContent === "NEW", "older response discarded, got " + byId("t9-out").textContent);
+  });
+
+  // ---- run ---------------------------------------------------------------
+
+  (async function run() {
+    for (var i = 0; i < tests.length; i++) {
+      window.__requests = [];
+      try {
+        await tests[i].fn();
+        results.push({ name: tests[i].name, ok: true });
+      } catch (e) {
+        results.push({ name: tests[i].name, ok: false, error: String((e && e.stack) || e) });
+      }
+      var old = document.querySelectorAll(".fixture");
+      for (var j = 0; j < old.length; j++) old[j].remove();
+    }
+    var log = document.getElementById("log");
+    log.textContent = results.map(function (r) {
+      return (r.ok ? "ok   " : "FAIL ") + r.name + (r.ok ? "" : "\n     " + r.error);
+    }).join("\n");
+    window.__htmlactTests.done = true;
+    console.log(log.textContent);
+  })();
+</script>
+</body>
+</html>
