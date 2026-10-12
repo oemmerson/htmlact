@@ -79,6 +79,12 @@ Every request element on the page cycle through the following steps.
    {- Otherwise loop to 1 (if the element still exists
       after the effect).}}}}
 
+A request element can have several requests in flight at once. Only the
+latest one applies its response: a response that lands after a newer
+request has started on the same element is discarded, and it does not
+touch the feedback classes or the {{!response_headers}special headers}.
+This keeps a slow request from overwriting the result of a newer one.
+
 {1:selector Selector syntax}
 
 Attributes of [htmlact] use

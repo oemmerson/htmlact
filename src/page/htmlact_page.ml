@@ -733,17 +733,46 @@ module Response = struct
       | parts -> Ok (Jstr.concat (List.rev parts))
 end
 
+(* Request sequencing. A request element can have several requests in
+   flight; only the latest one may apply its response, so an older one
+   that lands late is discarded. The counter is a JavaScript property on
+   the element, so an effect that replaces the element starts afresh. *)
+
+let request_seq_prop = "htmlactRequestSeq"
+
+let next_request_seq el =
+  let el = El.to_jv el in
+  let n =
+    match Jv.get el request_seq_prop with
+    | v when Jv.is_none v -> 1
+    | _ -> Jv.Int.get el request_seq_prop + 1
+  in
+  Jv.Int.set el request_seq_prop n;
+  n
+
+let is_latest_request el n =
+  let el = El.to_jv el in
+  match Jv.get el request_seq_prop with
+  | v when Jv.is_none v -> false
+  | _ -> Jv.Int.get el request_seq_prop = n
+
 let http_request
     requestel meth url query target effect' feedback referrer_policy
   =
   let open Fut.Syntax in
+  let seq = next_request_seq requestel in
   Feedback.start_request ~requestel feedback;
   let resp =
     Fetch.request (Request.to_fetch_request ~referrer_policy url meth query)
   in
   let resp = Fut.bind resp @@ function
-  | Error _ as e -> Feedback.error_request ~requestel feedback; Fut.return e
+  | Error _ as e ->
+      if is_latest_request requestel seq then
+        Feedback.error_request ~requestel feedback;
+      Fut.return e
   | Ok resp ->
+      if not (is_latest_request requestel seq) then Fut.return (Ok ())
+      else
       let hs = Fetch.Response.headers resp in
       let () =
         (* The request was succesful so we assume leaving the page
@@ -764,10 +793,14 @@ let http_request
                   Feedback.error_request ~requestel feedback;
                   Fut.return e
               | Ok html ->
-                  Feedback.end_request ~requestel feedback;
-                  let* () = Effect.apply ~target effect' html in
-                  send_cycle_ev ev_cycle_end;
-                  Fut.ok ()
+                  if not (is_latest_request requestel seq) then
+                    Fut.return (Ok ())
+                  else begin
+                    Feedback.end_request ~requestel feedback;
+                    let* () = Effect.apply ~target effect' html in
+                    send_cycle_ev ev_cycle_end;
+                    Fut.ok ()
+                  end
               end
   in
   Fut.await resp (el_log_if_error requestel);
