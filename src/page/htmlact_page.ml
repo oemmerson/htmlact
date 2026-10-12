@@ -463,7 +463,7 @@ module Effect = struct
   let feedback_remove ~target kind =
     let rem = match kind with
     | Element -> Some (El.parent target |> Option.get, [target])
-    | Children -> Some (target, El.children target)
+    | Children -> Some (target, El.children ~only_els:true target)
     | _ -> None
     in
     match rem with
@@ -505,7 +505,8 @@ module Effect = struct
 
   let apply_children ~target html_part =
     Jv.Jstr.set (El.to_jv target) "innerHTML" html_part;
-    feedback_insert ~parent:target ~inserts:(El.children target)
+    feedback_insert ~parent:target
+      ~inserts:(El.children ~only_els:true target)
 
   let apply_insert ~target pos html_part =
     let before el = El.of_jv @@ Jv.call (El.to_jv el) "previousSibling" [||] in
@@ -516,9 +517,9 @@ module Effect = struct
       if Jstr.(equal pos (v "beforebegin"))
       then El.parent target |> Option.get, before target else
       if Jstr.(equal pos (v "afterbegin"))
-      then target, List.hd (El.children target) else
+      then target, List.hd (El.children ~only_els:true target) else
       if Jstr.(equal pos (v "beforeend"))
-      then target, List.hd (List.rev (El.children target)) else
+      then target, List.hd (List.rev (El.children ~only_els:true target)) else
       if Jstr.(equal pos (v "afterend"))
       then El.parent target |> Option.get, after target else
       assert false
