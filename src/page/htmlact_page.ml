@@ -55,6 +55,7 @@ module At = struct
   let request = Jstr.v "data-request"
   let sel_request = Jstr.v "[data-request]"
   let referrer_policy = Jstr.v "data-referrer-policy"
+  let response_sel = Jstr.v "data-response-sel"
 end
 
 module Class = struct
@@ -703,6 +704,35 @@ module Request = struct
         Fetch.Request.v ~init url
 end
 
+(* Response selection *)
+
+module Response = struct
+  (* [select ~requestel html] is the part of [html] the request element's
+     [data-response-sel] selector picks, or [html] itself when there is no
+     selector. The selector is applied to the response parsed in a
+     {!El.t} template, so it cannot reach anything outside the response. *)
+  let select ~requestel html = match El.at At.response_sel requestel with
+  | None -> Ok html
+  | Some sel ->
+      let sel = Jstr.trim sel in
+      if Jstr.is_empty sel then Ok html else
+      let doc = Jv.get Jv.global "document" in
+      let tpl =
+        El.of_jv
+          (Jv.call doc "createElement" [| Jv.of_jstr (Jstr.v "template") |])
+      in
+      Jv.Jstr.set (El.to_jv tpl) "innerHTML" html;
+      let content = El.of_jv (Jv.get (El.to_jv tpl) "content") in
+      let parts =
+        El.fold_find_by_selector ~root:content
+          (fun el acc -> Jv.Jstr.get (El.to_jv el) "outerHTML" :: acc)
+          sel []
+      in
+      match parts with
+      | [] -> error Jstr.(v "response selector " + sel + v ": no match")
+      | parts -> Ok (Jstr.concat (List.rev parts))
+end
+
 let http_request
     requestel meth url query target effect' feedback referrer_policy
   =
@@ -729,10 +759,16 @@ let http_request
           | Error _ as e ->
               Feedback.error_request ~requestel feedback; Fut.return e
           | Ok html ->
-              Feedback.end_request ~requestel feedback;
-              let* () = Effect.apply ~target effect' html in
-              send_cycle_ev ev_cycle_end;
-              Fut.ok ()
+              begin match Response.select ~requestel html with
+              | Error _ as e ->
+                  Feedback.error_request ~requestel feedback;
+                  Fut.return e
+              | Ok html ->
+                  Feedback.end_request ~requestel feedback;
+                  let* () = Effect.apply ~target effect' html in
+                  send_cycle_ev ev_cycle_end;
+                  Fut.ok ()
+              end
   in
   Fut.await resp (el_log_if_error requestel);
   Ok ()

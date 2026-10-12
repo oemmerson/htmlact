@@ -328,6 +328,17 @@ a websocket connection. [<m>] is the HTTP request method or [SSE]
 to request a server sent events connection; defaults to [GET]
 if unspecified.
 
+{2:data_response_sel [data-response-sel="<sel>"]}
+
+The part of the response the {{!data_effect}effect} applies to. When
+unspecified the whole response is used. [<sel>] is a CSS selector applied
+to the response parsed on its own: the elements it matches are re-serialised
+and replace the response, in document order. This is the response-side
+counterpart of {{!data_target}[data-target]} and lets a server that renders a
+whole page answer with a page while the effect only swaps the region the
+selector picks. The selector cannot reach the surrounding document, and a
+selector that matches nothing errors the connection cycle.
+
 {2:data_target [data-target="<sel>"]}
 
 The target DOM element, as selected by the first element of [<sel>],
