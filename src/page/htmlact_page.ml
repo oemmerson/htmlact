@@ -187,11 +187,22 @@ module Query = struct
     in
     Form.Data.fold append_entry fd1 fd0
 
+  let is_checkable el = match El.at (Jstr.v "type") el with
+  | None -> false
+  | Some ty ->
+      Jstr.(equal ty (v "checkbox") || equal ty (v "radio"))
+
   let append_el_query_data el fd =
     match Jstr.(equal (El.tag_name el) (Jstr.v "form")) with
     | true -> append_form_data fd (Form.Data.of_form (Form.of_el el))
     | false ->
-        let v = El.prop El.Prop.value el in
+        let v =
+          (* Like [Form.Data], a checkbox or radio only contributes its value
+             when it is checked *)
+          if is_checkable el && not (El.prop El.Prop.checked el)
+          then Jstr.empty
+          else El.prop El.Prop.value el
+        in
         if Jstr.is_empty v then fd else
         let n = El.prop El.Prop.name el in
         let n = if Jstr.is_empty n then Jstr.v "value" else n in

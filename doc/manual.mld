@@ -288,7 +288,10 @@ selected by [<sel>] appending:
 {- If the element has a {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#htmlattrdefvalue}value} property [<value>]
    and the element has a [name] property value [<name>], a
    [<name>] to [<value>] binding. If the element has no [name]
-   use ["value"] for the [<name>].}
+   use ["value"] for the [<name>]. A checkbox or radio input only
+   contributes its value when it is
+   {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input#htmlattrdefchecked}checked},
+   as it does in a [form].}
 {- Otherwise, nothing.}}
 
 The query is transmitted in the URL on [GET] or [HEAD] requests and

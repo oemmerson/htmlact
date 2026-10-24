@@ -152,6 +152,18 @@
     assert(byId("t9-out").textContent === "NEW", "older response discarded, got " + byId("t9-out").textContent);
   });
 
+  test("a lone checkbox queries its checked state", async function () {
+    window.__respond = function () { return { body: "x" }; };
+    var w = await fixture('<label class="lone"><input type="checkbox" name="starred" value="1" id="t10" data-request="GET /t10" data-effect="none">Box</label>');
+    var b = w.querySelector("input");
+    b.click();
+    assert(await until(function () { return window.__requests.length === 1; }), "ticking sends a request");
+    assert(window.__requests[0].url.indexOf("starred=1") >= 0, "ticked carries starred=1, got " + window.__requests[0].url);
+    b.click();
+    assert(await until(function () { return window.__requests.length === 2; }), "clearing sends a request");
+    assert(window.__requests[1].url.indexOf("starred") < 0, "cleared carries no starred, got " + window.__requests[1].url);
+  });
+
   // ---- run ---------------------------------------------------------------
 
   (async function run() {
