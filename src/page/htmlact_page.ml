@@ -94,16 +94,22 @@ end
 (* Selectors *)
 
 module Sel = struct
-  type up = Jstr.t * Jstr.t list (* el name (or empty string) and classes *)
+  type up = Jstr.t * Jstr.t * Jstr.t list
+  (* Element name, id (or empty string) and classes *)
+
   type t = up list * Jstr.t (* up selectors and CSS selector *)
 
-  let rec find_up el (n, classes as up) = match El.parent el with
+  let rec find_up el (n, id, classes as up) = match El.parent el with
   | None -> None
   | Some el ->
       let n_match = Jstr.is_empty n || Jstr.equal n (El.tag_name el) in
+      let id_match = match El.at (Jstr.v "id") el with
+      | _ when Jstr.is_empty id -> true
+      | None -> false
+      | Some id' -> Jstr.equal id id'
+      in
       let c_match = List.for_all (fun c -> El.class' c el) classes in
-      if n_match && c_match then Some el else find_up el up
-
+      if n_match && id_match && c_match then Some el else find_up el up
   let rec find_ups el = function
   | [] -> Some el
   | u :: us -> match find_up el u with None -> None | Some el -> find_ups el us
@@ -121,6 +127,22 @@ module Sel = struct
   let scope_str = Jstr.v ":scope"
   let up_str = Jstr.v ":up"
   let dot = Jstr.v "."
+  let hash = Jstr.v "#"
+
+  let up_of_jstr s = match Jstr.find_sub ~sub:hash s with
+  | None ->
+      let n, classes = match Jstr.cuts ~sep:dot s with
+      | [] -> Jstr.empty, []
+      | n :: classes -> n, classes
+      in
+      n, Jstr.empty, classes
+  | Some i ->
+      let n = Jstr.slice ~stop:i s in
+      let id, classes = match Jstr.cuts ~sep:dot (Jstr.slice ~start:(i + 1) s) with
+      | [] -> Jstr.empty, []
+      | id :: classes -> id, classes
+      in
+      n, id, classes
   let of_jstr s =
     let rec loop ups i s =
       let next = match Jstr.find_sub ~start:i ~sub:up_str s with
@@ -140,16 +162,16 @@ module Sel = struct
           List.rev ups, css_sel
       | Some j ->
           let pre = Jstr.trim (Jstr.slice ~start:i ~stop:j s) in
-          let ups = match Jstr.cuts ~sep:dot pre with
-          | [] -> (Jstr.empty, []) :: ups
-          | t :: classes -> (t, classes) :: ups
-          in
+          let ups = up_of_jstr pre :: ups in
           loop ups (j + 3) s
     in
     loop [] 0 s
 
   let to_jstr (ups, css_sel) =
-    let up_to_jstr (t, cs) = Jstr.(concat ~sep:dot (t :: cs) + up_str) in
+    let up_to_jstr (n, id, cs) =
+      let n = if Jstr.is_empty id then n else Jstr.(n + hash + id) in
+      Jstr.(concat ~sep:dot (n :: cs) + up_str)
+    in
     let ups_to_jstr ups = Jstr.concat ~sep:Jstr.sp (List.map up_to_jstr ups) in
     Jstr.(ups_to_jstr ups + sp + css_sel)
 end

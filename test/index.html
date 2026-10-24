@@ -164,6 +164,14 @@
     assert(window.__requests[1].url.indexOf("starred") < 0, "cleared carries no starred, got " + window.__requests[1].url);
   });
 
+  test("data-target takes an id in the up selector", async function () {
+    window.__respond = function () { return { body: '<p id="t11-out">ok</p>' }; };
+    var w = await fixture('<div id="t11-wrap"><div id="t11-region"><button type="button" data-request="GET /t11" data-target="#t11-region:up" data-effect="element">go</button></div></div>');
+    w.querySelector("button").click();
+    assert(await until(function () { return byId("t11-out"); }), "ancestor found by id");
+    assert(byId("t11-region") === null, "old region gone");
+  });
+
   // ---- run ---------------------------------------------------------------
 
   (async function run() {

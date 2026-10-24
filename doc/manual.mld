@@ -103,8 +103,8 @@ specifications which select the root on which the CSS selector is then
 applied. This provides full tree addressing: first move up to find an
 ancestor and then down by applying the CSS selector to it.
 
-An ancestor specification is made of an optional element, optional
-classes and the made up [:up] pseudo-class. The semantic is to move up
+An ancestor specification is made of an optional element, optional id,
+optional classes and the made up [:up] pseudo-class. The semantic is to move up
 from the element by following the up selectors from left-to-right and
 then apply the CSS selector on ancestor that was found.
 
@@ -119,6 +119,8 @@ Examples:
   .beet:up .root:up  # move to beet ancestor, then to root ancestor
   ul.beet.root:up    # ul ancestor with classes beet and root
   div:up .beet       # div ancestor, beet classified descendents
+  #items:up          # ancestor with id items
+  li#item.beet:up    # li ancestor whose id is item and has class beet
 v}
 
 The full syntax as an {{:https://tools.ietf.org/html/rfc5234}RFC 5234 ABNF}
@@ -126,8 +128,9 @@ grammar is described as follows:
 
 {v
          sel = *(up SP) css-selector
-          up = [[el] *class] ":up"
+          up = [[el] ["#" id] *class] ":up"
           el = 1*(ALPHA)
+          id = 1*VCHAR
        class = "." 1*(ALPHA)
 css-selector = …   # See the CSS specification
 v}
