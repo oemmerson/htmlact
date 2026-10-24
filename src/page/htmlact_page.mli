@@ -38,6 +38,15 @@ module Ev : sig
 
       {b FIXME.} Wouldn't it be better to expose MutationObserver
       hooks ?  *)
+
+  val before_swap : unit Brr.Ev.type'
+  (** [before_swap] is sent on the {{!page-manual.data_target}target} element
+      just before {{!page-manual.data_effect}the effect} is applied to it. *)
+
+  val after_swap : unit Brr.Ev.type'
+  (** [after_swap] is sent on the element that received the fragment - the
+      target itself for a [children] effect, its parent for an [element] one -
+      once the fragment is in the DOM. *)
 end
 
 

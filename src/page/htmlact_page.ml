@@ -24,10 +24,18 @@ let ev_cycle_start = Ev.Type.create (Jstr.v "htmlact-cycle-start")
 let ev_cycle_end = Ev.Type.create (Jstr.v "htmlact-cycle-end")
 let ev_cycle_error = Ev.Type.create (Jstr.v "htmlact-cycle-error")
 let ev_htmlact_in = Ev.Type.create (Jstr.v "htmlact-in")
+let ev_before_swap = Ev.Type.create (Jstr.v "htmlact-before-swap")
+let ev_after_swap = Ev.Type.create (Jstr.v "htmlact-after-swap")
 
 let send_cycle_ev ev =
   (* FIXME maybe we coud honour the Js cancellation stuff. *)
   ignore (Ev.dispatch (Ev.create ev) (Document.as_target G.document))
+
+(* Unlike the cycle events, which go to the document, the swap events are sent
+   on elements: they have to bubble to be seen by a listener that outlives the
+   element it is watching. *)
+let send_swap_ev ev el =
+  ignore (Ev.dispatch (Ev.create ~init:(Ev.init ~bubbles:true ()) ev) el)
 
 (* Error management
 
@@ -509,6 +517,10 @@ module Effect = struct
         Fut.return ()
 
   let feedback_insert ~parent ~inserts =
+    (* Sent on the element the fragment landed in - the target itself for a
+       [children] effect, its parent for an [element] one - once it is in the
+       DOM, so a listener can look at what arrived. *)
+    send_swap_ev ev_after_swap (El.as_target parent);
     if (Ev.dispatch (Ev.create ev_htmlact_in) (El.as_target parent)) then begin
       Feedback.insert ~parent ~inserts true;
       (* Make sure we had a render of [true]. *)
@@ -830,6 +842,9 @@ let http_request
                     Fut.return (Ok ())
                   else begin
                     Feedback.end_request ~requestel feedback;
+                    (* The target is still the one the request element pointed
+                       at, and still holds the state about to be replaced. *)
+                    send_swap_ev ev_before_swap (El.as_target target);
                     let* () = Effect.apply ~target effect' html in
                     send_cycle_ev ev_cycle_end;
                     Fut.ok ()
@@ -906,4 +921,6 @@ module Ev = struct
   let cycle_end = ev_cycle_end
   let cycle_error = ev_cycle_error
   let htmlact_in = ev_htmlact_in
+  let before_swap = ev_before_swap
+  let after_swap = ev_after_swap
 end

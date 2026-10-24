@@ -172,6 +172,29 @@
     assert(byId("t11-region") === null, "old region gone");
   });
 
+  test("swap events bracket a swap", async function () {
+    var seen = [];
+    function record (kind) {
+      return function (e) { seen.push(kind + ":" + (e.target.id || "")); };
+    }
+    var onBefore = record("before");
+    var onAfter = record("after");
+    document.addEventListener("htmlact-before-swap", onBefore);
+    document.addEventListener("htmlact-after-swap", onAfter);
+    try {
+      window.__respond = function () { return { body: '<p id="t12-new">new</p>' }; };
+      var w = await fixture('<div id="t12-wrap"><div id="t12-region"><button type="button" data-request="GET /t12" data-target=":up" data-effect="element">go</button></div></div>');
+      w.querySelector("button").click();
+      assert(await until(function () { return byId("t12-new"); }), "swapped in");
+      assert(await until(function () { return seen.length === 2; }), "two events, got " + seen.join(" "));
+      assert(seen[0] === "before:t12-region", "before on the old target, got " + seen[0]);
+      assert(seen[1] === "after:t12-wrap", "after on the insertion container, got " + seen[1]);
+    } finally {
+      document.removeEventListener("htmlact-before-swap", onBefore);
+      document.removeEventListener("htmlact-after-swap", onAfter);
+    }
+  });
+
   // ---- run ---------------------------------------------------------------
 
   (async function run() {

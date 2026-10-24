@@ -85,6 +85,23 @@ request has started on the same element is discarded, and it does not
 touch the feedback classes or the {{!response_headers}special headers}.
 This keeps a slow request from overwriting the result of a newer one.
 
+{2:events Swap events}
+
+Two events let script observe the effect without polling:
+
+{ul
+{- [htmlact-before-swap] is sent on the {{!data_target}target} element just
+   before the effect is applied, while the DOM still holds the state about to
+   be replaced.}
+{- [htmlact-after-swap] is sent on the element that received the fragment -
+   the target itself for a [children] effect, its parent for an [element] one -
+   once the fragment is in the DOM.}}
+
+Both bubble, so a listener on the document sees every swap and can tell which
+region changed from [event.target]. They are sent only when there is something
+to swap: a response consumed by a {{!response_headers}special header}, an
+[effect] of [none], and a failed request emit neither.
+
 {1:selector Selector syntax}
 
 Attributes of [htmlact] use
